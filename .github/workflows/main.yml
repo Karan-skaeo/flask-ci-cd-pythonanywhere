@@ -24,14 +24,14 @@ jobs:
           REMOTE_USER: ${{ vars.PA_USERNAME }}
           REMOTE_HOST: ssh.pythonanywhere.com
         run: |
-          # Use sshpass to log in and execute remote commands
-          sshpass -e ssh -o StrictHostKeyChecking=no ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }} << 'EOF'
+          # Use sshpass to log in and execute remote commands with a forced terminal
+          sshpass -e ssh -tt -o StrictHostKeyChecking=no ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }} << 'EOF'
             set -e  # Exit on error
-
+      
             # Set up variables
             PROJECT_DIR=~/flask-project
             BACKUP_DIR="${PROJECT_DIR}-$(date +%Y%m%d%H%M%S)"
-
+      
             # Archive old project if exists
             if [ -d "$PROJECT_DIR" ]; then
               echo "Archiving existing project..."
@@ -39,22 +39,23 @@ jobs:
               tar -czf ${BACKUP_DIR}.tar.gz $BACKUP_DIR
               rm -rf $BACKUP_DIR
             fi
-
+      
             # Clone the latest code
             git clone --branch main https://github.com/Karan-skaeo/flask-ci-cd-pythonanywhere.git $PROJECT_DIR
-
+      
             # Navigate to project
             cd $PROJECT_DIR
-
+      
             # Create .env file
             echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" > .env
             echo "DEBUG=True" >> .env
-
+      
             # Set up virtual environment
             python3 -m venv venv
             source venv/bin/activate
-
+      
             # Install dependencies
             pip install --upgrade pip
             pip install -r requirements.txt
           EOF
+        
