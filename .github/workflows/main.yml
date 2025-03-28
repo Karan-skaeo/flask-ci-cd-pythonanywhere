@@ -10,19 +10,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v3
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-      - name: Set up SSH Key
+      - name: Install sshpass
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.PA_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan ssh.pythonanywhere.com >> ~/.ssh/known_hosts
+          sudo apt-get update
+          sudo apt-get install -y sshpass
 
-      - name: Setup Environment on PythonAnywhere
+      - name: Deploy to PythonAnywhere
+        env:
+          SSHPASS: ${{ secrets.PA_PASSWORD }}
+          REMOTE_USER: ${{ vars.PA_USERNAME }}
+          REMOTE_HOST: ssh.pythonanywhere.com
         run: |
-          ssh ${{ secrets.PA_USERNAME }}@ssh.pythonanywhere.com << 'EOF'
+          # Use sshpass to log in and execute remote commands
+          sshpass -e ssh -o StrictHostKeyChecking=no ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }} << 'EOF'
             set -e  # Exit on error
 
             # Set up variables
