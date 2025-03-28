@@ -38,7 +38,7 @@ jobs:
             fi
 
             # Clone the latest code
-            git clone --branch main git@github.com:Karan-skaeo/flask-ci-cd-pythonanywhere.git $PROJECT_DIR
+            git clone --branch main https://github.com/Karan-skaeo/flask-ci-cd-pythonanywhere.git $PROJECT_DIR
 
             # Navigate to project
             cd $PROJECT_DIR
