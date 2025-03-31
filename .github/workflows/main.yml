@@ -1,4 +1,4 @@
-name: Setup PythonAnywhere Environment
+name: Deploy to AWS EC2
 
 on:
   push:
@@ -6,56 +6,60 @@ on:
       - '*'  # Runs only when a tag is created
 
 jobs:
-  setup:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      - name: Install sshpass
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y sshpass
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1b
 
-      - name: Deploy to PythonAnywhere
+      - name: Install SSH Client
+        run: sudo apt-get update && sudo apt-get install -y openssh-client
+
+      - name: Deploy to EC2
         env:
-          SSHPASS: ${{ secrets.PA_PASSWORD }}
-          REMOTE_USER: ${{ vars.PA_USERNAME }}
-          REMOTE_HOST: ssh.pythonanywhere.com
+          PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          HOST: ${{ secrets.EC2_PUBLIC_IP }}
+          USER: ubuntu
         run: |
-          # Use sshpass to log in and execute remote commands with a forced terminal
-          sshpass -e ssh -tt -o StrictHostKeyChecking=no ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }} << 'EOF'
-            set -e  # Exit on error
-      
-            # Set up variables
-            PROJECT_DIR=~/flask-project
-            BACKUP_DIR="${PROJECT_DIR}-$(date +%Y%m%d%H%M%S)"
-      
-            # Archive old project if exists
-            if [ -d "$PROJECT_DIR" ]; then
-              echo "Archiving existing project..."
-              mv $PROJECT_DIR $BACKUP_DIR
-              tar -czf ${BACKUP_DIR}.tar.gz $BACKUP_DIR
-              rm -rf $BACKUP_DIR
-            fi
-      
-            # Clone the latest code
+          echo "$PRIVATE_KEY" > private_key.pem
+          chmod 600 private_key.pem
+
+          # Connect to EC2 and deploy code
+          ssh -o StrictHostKeyChecking=no -i private_key.pem $USER@$HOST << 'EOF'
+          
+          # Change directory to your project (or create if not exists)
+          PROJECT_DIR=~/flask-project
+          if [ ! -d "$PROJECT_DIR" ]; then
             git clone --branch main https://github.com/Karan-skaeo/flask-ci-cd-pythonanywhere.git $PROJECT_DIR
-      
-            # Navigate to project
+          else
             cd $PROJECT_DIR
-      
-            # Create .env file
-            echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" > .env
-            echo "DEBUG=True" >> .env
-      
-            # Set up virtual environment
-            python3 -m venv venv
-            source venv/bin/activate
-      
-            # Install dependencies
-            pip install --upgrade pip
-            pip install -r requirements.txt
+            git pull origin main
+          fi
+
+          # Navigate to project directory
+          cd $PROJECT_DIR
+
+          # Create and activate virtual environment
+          python3 -m venv venv
+          source venv/bin/activate
+
+          # Install dependencies
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+          # Run Linter
+          pip install flake8
+          flake8
+
+          # Restart the application (assumes gunicorn is used)
+          sudo systemctl restart flask-app
+
           EOF
-        
